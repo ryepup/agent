@@ -73,6 +73,7 @@ func Test_GrpcConnection(t *testing.T) {
 	require.NoError(t, conn.Close(ctx))
 }
 
+// nolint: revive
 func Test_GetDialOptions(t *testing.T) {
 	tests := []struct {
 		agentConfig *config.Config

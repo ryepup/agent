@@ -237,12 +237,14 @@ func registerCommandFlags(fs *flag.FlagSet) {
 	fs.String(
 		CommandAuthTokenKey,
 		DefCommandAuthTokenKey,
-		"The token used in the authentication handshake with the command server endpoint for command and control.",
+		"The token used in the authentication handshake with the command server endpoint for "+
+			"command and control.",
 	)
 	fs.String(
 		CommandAuthTokenPathKey,
 		DefCommandAuthTokenPathKey,
-		"Path to the token used in the authentication handshake with the command server endpoint for command and control.",
+		"Path to the token used in the authentication handshake with the command server endpoint "+
+			"for command and control.",
 	)
 	fs.String(
 		CommandTLSCertKey,

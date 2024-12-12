@@ -249,7 +249,6 @@ func GetDialOptions(agentConfig *config.Config, resourceID string) []grpc.DialOp
 }
 
 func validateTokenFile(path string) (string, error) {
-
 	if path == "" {
 		slog.Error("Token file path is empty")
 		return "", errors.New("token file path is empty")
@@ -268,11 +267,11 @@ func validateTokenFile(path string) (string, error) {
 	if err != nil {
 		slog.Error("Unable to read token from file", "error", err)
 		return "", err
-	} else {
-		keyBytes = bytes.TrimSpace(keyBytes)
-		keyBytes = bytes.TrimRight(keyBytes, "\n")
-		keyVal = string(keyBytes)
 	}
+	
+	keyBytes = bytes.TrimSpace(keyBytes)
+	keyBytes = bytes.TrimRight(keyBytes, "\n")
+	keyVal = string(keyBytes)
 
 	if keyVal == "" {
 		slog.Error("failed to load token, please check agent configuration")
