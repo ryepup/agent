@@ -117,7 +117,7 @@ func AgentConfig() *config.Config {
 				Type: config.Grpc,
 			},
 			Auth: &config.AuthConfig{
-				Token: "1234",
+				Token: "/tmp/dp-token",
 			},
 			TLS: &config.TLSConfig{
 				Cert:       "cert.pem",

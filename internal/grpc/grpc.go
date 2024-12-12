@@ -6,12 +6,14 @@
 package grpc
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net"
+	"os"
 	"sync"
 
 	"github.com/cenkalti/backoff/v4"
@@ -215,6 +217,7 @@ func GetDialOptions(agentConfig *config.Config, resourceID string) []grpc.DialOp
 			grpc.WithTransportCredentials(transportCredentials),
 		)
 	} else {
+		slog.Error("Unable to add transport credentials to gRPC dial options", "error", err)
 		slog.Debug("Adding default transport credentials to gRPC dial options")
 		opts = append(opts,
 			grpc.WithTransportCredentials(defaultCredentials),
@@ -223,17 +226,60 @@ func GetDialOptions(agentConfig *config.Config, resourceID string) []grpc.DialOp
 	}
 
 	if agentConfig.Command.Auth != nil && !skipToken {
+		key := agentConfig.Command.Auth.Token
+
+		if agentConfig.Command.Auth.TokenPath != "" {
+			key, err = validateTokenFile(agentConfig.Command.Auth.TokenPath)
+			if err != nil {
+				slog.Error("Unable to add token to gRPC dial options, token will be empty", "error", err)
+			}
+		}
+
 		slog.Debug("Adding token to RPC credentials")
 		opts = append(opts,
 			grpc.WithPerRPCCredentials(
 				&PerRPCCredentials{
-					Token: agentConfig.Command.Auth.Token,
+					Token: key,
 					ID:    resourceID,
 				}),
 		)
 	}
 
 	return opts
+}
+
+func validateTokenFile(path string) (string, error) {
+
+	if path == "" {
+		slog.Error("Token file path is empty")
+		return "", errors.New("token file path is empty")
+	}
+
+	slog.Debug("Checking token file", "path", path)
+	_, err := os.Stat(path)
+	if err != nil {
+		slog.Error("Unable to find token file", "path", path, "error", err)
+		return "", err
+	}
+
+	slog.Debug("Reading dataplane key from file", "path", path)
+	var keyVal string
+	keyBytes, err := os.ReadFile(path)
+	if err != nil {
+		slog.Error("Unable to read token from file", "error", err)
+		return "", err
+	} else {
+		keyBytes = bytes.TrimSpace(keyBytes)
+		keyBytes = bytes.TrimRight(keyBytes, "\n")
+		keyVal = string(keyBytes)
+	}
+
+	if keyVal == "" {
+		slog.Error("failed to load token, please check agent configuration")
+		return "", errors.New("failed to load token, please check agent configuration")
+	}
+
+	return keyVal, nil
 }
 
 // Have to create our own UnaryClientInterceptor function since protovalidate only provides a UnaryServerInterceptor

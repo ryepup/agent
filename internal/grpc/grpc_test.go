@@ -8,6 +8,7 @@ package grpc
 import (
 	"context"
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/cenkalti/backoff/v4"
@@ -78,6 +79,7 @@ func Test_GetDialOptions(t *testing.T) {
 		name        string
 		expected    int
 		createCerts bool
+		createDPKey bool
 	}{
 		{
 			name: "Test 1: DialOptions insecure",
@@ -158,6 +160,21 @@ func Test_GetDialOptions(t *testing.T) {
 			},
 			expected:    7,
 			createCerts: false,
+			createDPKey: true,
+		},
+		{
+			name: "Test 7: DialOptions Auth with file path",
+			agentConfig: &config.Config{
+				Client: types.AgentConfig().Client,
+				Command: &config.Command{
+					Server: types.AgentConfig().Command.Server,
+					Auth:   types.AgentConfig().Command.Auth,
+					TLS:    types.AgentConfig().Command.TLS,
+				},
+			},
+			expected:    6,
+			createCerts: false,
+			createDPKey: true,
 		},
 	}
 
@@ -180,6 +197,14 @@ func Test_GetDialOptions(t *testing.T) {
 				test.agentConfig.Command.TLS.Cert = fmt.Sprintf("%s%s%s", tmpDir, pathSeparator, certFileName)
 				test.agentConfig.Command.TLS.Key = fmt.Sprintf("%s%s%s", tmpDir, pathSeparator, keyFileName)
 				test.agentConfig.Command.TLS.Ca = fmt.Sprintf("%s%s%s", tmpDir, pathSeparator, caFileName)
+			}
+
+			if test.createDPKey {
+				tmpFile, err := os.Create(t.TempDir() + "/dp-token")
+				if err != nil {
+					t.Fatal(err)
+				}
+				test.agentConfig.Command.Auth.Token = tmpFile.Name()
 			}
 
 			options := GetDialOptions(test.agentConfig, "123")
