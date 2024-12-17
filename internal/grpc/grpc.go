@@ -160,7 +160,6 @@ func (w *wrappedStream) SendMsg(message any) error {
 }
 
 func GetDialOptions(agentConfig *config.Config, resourceID string) []grpc.DialOption {
-	skipToken := false
 	streamClientInterceptors := []grpc.StreamClientInterceptor{grpcRetry.StreamClientInterceptor()}
 	unaryClientInterceptors := []grpc.UnaryClientInterceptor{grpcRetry.UnaryClientInterceptor()}
 
@@ -210,6 +209,40 @@ func GetDialOptions(agentConfig *config.Config, resourceID string) []grpc.DialOp
 
 	opts = append(opts, sendRecOpts...)
 
+	opts, skipToken := addTransportCredentials(agentConfig, opts)
+
+	if agentConfig.Command.Auth != nil && !skipToken {
+		opts = addPerRPCCredentials(agentConfig, resourceID, opts)
+	}
+
+	return opts
+}
+
+func addPerRPCCredentials(agentConfig *config.Config, resourceID string, opts []grpc.DialOption) []grpc.DialOption {
+	key := agentConfig.Command.Auth.Token
+
+	if agentConfig.Command.Auth.TokenPath != "" {
+		var err error
+		key, err = validateTokenFile(agentConfig.Command.Auth.TokenPath)
+		if err != nil {
+			slog.Error("Unable to add token to gRPC dial options, token will be empty", "error", err)
+		}
+	}
+
+	slog.Debug("Adding token to RPC credentials")
+	opts = append(opts,
+		grpc.WithPerRPCCredentials(
+			&PerRPCCredentials{
+				Token: key,
+				ID:    resourceID,
+			}),
+	)
+
+	return opts
+}
+
+func addTransportCredentials(agentConfig *config.Config, opts []grpc.DialOption) ([]grpc.DialOption, bool) {
+	skipToken := false
 	transportCredentials, err := getTransportCredentials(agentConfig)
 	if err == nil {
 		slog.Debug("Adding transport credentials to gRPC dial options")
@@ -225,27 +258,7 @@ func GetDialOptions(agentConfig *config.Config, resourceID string) []grpc.DialOp
 		skipToken = true
 	}
 
-	if agentConfig.Command.Auth != nil && !skipToken {
-		key := agentConfig.Command.Auth.Token
-
-		if agentConfig.Command.Auth.TokenPath != "" {
-			key, err = validateTokenFile(agentConfig.Command.Auth.TokenPath)
-			if err != nil {
-				slog.Error("Unable to add token to gRPC dial options, token will be empty", "error", err)
-			}
-		}
-
-		slog.Debug("Adding token to RPC credentials")
-		opts = append(opts,
-			grpc.WithPerRPCCredentials(
-				&PerRPCCredentials{
-					Token: key,
-					ID:    resourceID,
-				}),
-		)
-	}
-
-	return opts
+	return opts, skipToken
 }
 
 func validateTokenFile(path string) (string, error) {
@@ -268,7 +281,7 @@ func validateTokenFile(path string) (string, error) {
 		slog.Error("Unable to read token from file", "error", err)
 		return "", err
 	}
-	
+
 	keyBytes = bytes.TrimSpace(keyBytes)
 	keyBytes = bytes.TrimRight(keyBytes, "\n")
 	keyVal = string(keyBytes)
